@@ -3,18 +3,19 @@
 #include "Integrator.hpp"
 
 class Simulation {
-public:
+  public:
     Simulation();
 
     void update(double dt);
     void reset();
 
-    const State& state() const;
+    const State &state() const;
 
-private:
+  private:
     State initialState_{};
     State state_{};
-    NullIntegrator integrator_{};
+    FreeParticleIntegrator integrator_{};
 
-    // TODO(ARCHITECTURE): Revisit integrator ownership if runtime selection is needed.
+    // TODO(ARCHITECTURE): Revisit integrator ownership if runtime selection is
+    // needed.
 };

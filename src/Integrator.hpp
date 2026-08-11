@@ -16,12 +16,23 @@ class NullIntegrator final : public Integrator {
   public:
     void step(State &state, double dt) override {
         state.simulationTime += dt;
-        state.linearVelocity = Vector3{1.0, 0.0, 0.0};
         state.position = Vector3Add(state.position, state.linearVelocity * dt);
-        std::cout << "Pos: " << state.position.x << ", " << state.position.y
-                  << ", " << state.position.z << "\n";
 
         // TODO(PHYSICS): Integrate position and velocity once a model exists.
         // TODO(INTEGRATOR): Add a real numerical integration method.
+    }
+};
+
+class FreeParticleIntegrator : public Integrator {
+  public:
+    void step(State &state, double dt) override {
+        state.simulationTime += dt;
+        float h = dt;
+        state.prevPos = state.position - Vector3Scale(state.linearVelocity, h);
+        Vector3 increment = Vector3Subtract(state.position, state.prevPos); // Algebra Displacement
+        Vector3 nextPosition = Vector3Add(state.position, increment); // Group composition
+
+        state.prevPos = state.position;
+        state.position = nextPosition;
     }
 };
