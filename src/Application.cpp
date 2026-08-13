@@ -40,6 +40,8 @@ void Application::run() {
         if (!paused_) {
             accumulator_ += frameTime;
             while (accumulator_ >= fixedDt) {
+                // Instead of updating through simulation, consider using
+                // the integrators step function here.
                 simulation_.update(fixedDt);
                 accumulator_ -= fixedDt;
             }
