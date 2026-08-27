@@ -8,6 +8,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(FetchContent)
 
+FetchContent_Declare(
+    versor
+    GIT_REPOSITORY https://github.com/wolftype/versor.git
+    GIT_TAG 8262fce98c99ea6d9f0984d2ac17cde9fe5d0519
+    GIT_SHALLOW TRUE
+)
+FetchContent_GetProperties(versor)
+if(NOT versor_POPULATED)
+    FetchContent_Populate(versor)
+endif()
+
 # Prefer a known-good system package when available. Otherwise CMake obtains
 # raylib automatically, keeping the project self-contained on other systems.
 find_package(raylib 5.5 QUIET)
@@ -42,6 +53,10 @@ if(APPLE)
 endif()
 
 target_include_directories(geometric-mechanics-sandbox PRIVATE src)
+target_include_directories(geometric-mechanics-sandbox PRIVATE
+    ${versor_SOURCE_DIR}/include
+)
+set_property(TARGET geometric-mechanics-sandbox PROPERTY CXX_STANDARD 20)
 target_link_libraries(geometric-mechanics-sandbox PRIVATE raylib)
 
 if(APPLE)

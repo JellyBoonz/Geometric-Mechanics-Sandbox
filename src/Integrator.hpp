@@ -1,8 +1,8 @@
 #pragma once
 
 #include "State.hpp"
+#include <vsr/detail/vsr_generic_op.h>
 #include "raymath.h"
-#include <iostream>
 
 class Integrator {
   public:
@@ -34,5 +34,19 @@ class FreeParticleIntegrator : public Integrator {
 
         state.prevPos = state.position;
         state.position = nextPosition;
+    }
+};
+
+class RotatingFreeParticleIntegrator : public Integrator {
+  public:
+    void step(State &state, double dt) override {
+        state.simulationTime += dt;
+
+        const auto deltaRotor = vsr::nga::Gen::rot(
+            state.angularVelocity * (static_cast<double>(dt) * 0.5));
+        state.orientation = state.orientation * deltaRotor;
+
+        // TODO(PHYSICS): Integrate angular velocity from rotational dynamics.
+        // TODO(INTEGRATOR): Replace this kinematic test with derived equations.
     }
 };

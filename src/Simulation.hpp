@@ -14,7 +14,7 @@ class Simulation {
   private:
     State initialState_{};
     State state_{};
-    FreeParticleIntegrator integrator_{};
+    RotatingFreeParticleIntegrator integrator_{};
 
     // TODO(ARCHITECTURE): Revisit integrator ownership if runtime selection is
     // needed.
