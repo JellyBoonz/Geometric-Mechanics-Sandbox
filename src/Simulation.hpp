@@ -8,14 +8,14 @@ class Simulation {
 
     void update(double dt);
     void reset();
+    void setCommands(ManeuverCommands commands);
 
     const State &state() const;
 
   private:
     State initialState_{};
     State state_{};
-    RotatingFreeParticleIntegrator integrator_{};
-
-    // TODO(ARCHITECTURE): Revisit integrator ownership if runtime selection is
-    // needed.
+    ManeuverCommands commands_{};
+    ManeuverModel model_{};
+    ManeuverableBoxIntegrator integrator_{};
 };

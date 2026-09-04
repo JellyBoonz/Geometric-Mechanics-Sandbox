@@ -50,3 +50,57 @@ class RotatingFreeParticleIntegrator : public Integrator {
         // TODO(INTEGRATOR): Replace this kinematic test with derived equations.
     }
 };
+
+// Commands are normalized player requests.  They are not physical quantities:
+// the model maps them to force and torque.
+struct ManeuverCommands {
+    double drive{0.0};  // W/S: forward/backward, in [-1, 1]
+    double steer{0.0};  // D/A: clockwise/counterclockwise, in [-1, 1]
+};
+
+// Stable settings of this particular planar-box experiment.
+struct ManeuverModel {
+    double mass{1.0};
+    double yawMomentOfInertia{0.5};
+    double maxDriveForce{8.0};
+    double maxYawTorque{2.0};
+};
+
+class ManeuverableBoxIntegrator final {
+  public:
+    void step(State &state, const ManeuverCommands &commands,
+              const ManeuverModel &model, double dt) const {
+        // The box's local +x direction is its forward direction.  Spinning it
+        // by the orientation expresses that direction in the world frame.
+        const auto worldForwardBlade = vsr::ega::Vec::x.spin(state.orientation);
+        const Vector3 worldForward{
+            static_cast<float>(worldForwardBlade[0]),
+            0.0f,
+            static_cast<float>(worldForwardBlade[2]),
+        };
+
+        const Vector3 driveForce =
+            Vector3Scale(worldForward,
+                         static_cast<float>(commands.drive * model.maxDriveForce));
+        const Vector3 linearAcceleration =
+            Vector3Scale(driveForce, static_cast<float>(1.0 / model.mass));
+        const double yawAcceleration =
+            commands.steer * model.maxYawTorque / model.yawMomentOfInertia;
+
+        // Semi-implicit Euler: update velocity from force/torque, then use the
+        // new velocity to reconstruct the configuration.
+        state.linearVelocity = Vector3Add(
+            state.linearVelocity,
+            Vector3Scale(linearAcceleration, static_cast<float>(dt)));
+        state.angularVelocity = state.angularVelocity +
+                                Bivector::xz * (yawAcceleration * dt);
+
+        state.position = Vector3Add(
+            state.position,
+            Vector3Scale(state.linearVelocity, static_cast<float>(dt)));
+        const auto deltaRotor = vsr::nga::Gen::rot(
+            state.angularVelocity * (dt * 0.5));
+        state.orientation = state.orientation * deltaRotor;
+        state.simulationTime += dt;
+    }
+};

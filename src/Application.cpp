@@ -37,6 +37,13 @@ void Application::run() {
             break;
         }
 
+        simulation_.setCommands({
+            static_cast<double>(IsKeyDown(KEY_W)) -
+                static_cast<double>(IsKeyDown(KEY_S)),
+            static_cast<double>(IsKeyDown(KEY_D)) -
+                static_cast<double>(IsKeyDown(KEY_A)),
+        });
+
         if (!paused_) {
             accumulator_ += frameTime;
             while (accumulator_ >= fixedDt) {

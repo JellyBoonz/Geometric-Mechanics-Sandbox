@@ -24,8 +24,18 @@ On non-macOS systems, run `./build/geometric-mechanics-sandbox` instead.
 - Space: pause or resume the simulation
 - R: reset to the initial state
 - N: advance exactly one fixed step while paused
+- W/S: apply forward/backward driving force
+- A/D: apply counterclockwise/clockwise yaw torque
 - Escape: quit
 - Mouse and keyboard camera controls: raylib's free camera controls
+
+## Next experiment
+
+The next planned experiment is a maneuverable planar box: keyboard input will
+drive it forward/backward and steer its yaw on the `xz` ground plane. It will
+then add a sideways applied force and a position-dependent ground-friction
+field. The staged model and its open physical choices are in
+[[notes/Box Maneuver and Friction Roadmap.md]].
 
 ## Execution flow
 
@@ -47,6 +57,6 @@ paused, the accumulator stops and `N` invokes exactly one fixed simulation step.
 The current rotational test computes a delta rotor from the constant angular
 velocity bivector and composes it with the current orientation. The renderer
 converts that rotor to an axis-angle representation only at the raylib
-boundary. Future mathematical and physical work belongs primarily in
-`State.hpp`, `Integrator.hpp`, and `Simulation.cpp`. The TODO comments in
-those files mark the deliberate extension points.
+boundary. The maneuver and friction work will primarily extend `Application`
+(input commands), `State` (physical quantities), `Simulation` (commands and
+model ownership), `Integrator` (one fixed step), and `Renderer` (diagnostics).
