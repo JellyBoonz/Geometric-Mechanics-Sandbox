@@ -52,7 +52,9 @@ void Application::run() {
             }
         }
 
-        renderer_.draw(simulation_.state(), camera_, fixedDt, paused_);
+        const auto &commands = simulation_.commands();
+        renderer_.draw(simulation_.state(), camera_, fixedDt, paused_,
+                       commands.drive, commands.steer);
     }
 
     CloseWindow();

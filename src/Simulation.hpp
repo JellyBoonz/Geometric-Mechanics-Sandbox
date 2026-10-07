@@ -11,6 +11,7 @@ class Simulation {
     void setCommands(ManeuverCommands commands);
 
     const State &state() const;
+    const ManeuverCommands &commands() const;
 
   private:
     State initialState_{};

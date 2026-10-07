@@ -18,3 +18,7 @@ void Simulation::setCommands(ManeuverCommands commands) {
 const State &Simulation::state() const {
     return state_;
 }
+
+const ManeuverCommands &Simulation::commands() const {
+    return commands_;
+}

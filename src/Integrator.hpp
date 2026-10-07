@@ -100,6 +100,7 @@ class ManeuverableBoxIntegrator final {
             Vector3Scale(state.linearVelocity, static_cast<float>(dt)));
         const auto deltaRotor = vsr::nga::Gen::rot(
             state.angularVelocity * (dt * 0.5));
+            
         state.orientation = state.orientation * deltaRotor;
         state.simulationTime += dt;
     }

@@ -4,7 +4,8 @@
 #include <vsr/detail/vsr_generic_op.h>
 #include "rlgl.h"
 
-void Renderer::draw(const State& state, const Camera3D& camera, double fixedDt, bool paused) const {
+void Renderer::draw(const State& state, const Camera3D& camera, double fixedDt,
+                    bool paused, double driveCommand, double steerCommand) const {
     BeginDrawing();
     ClearBackground(RAYWHITE);
 
@@ -32,11 +33,24 @@ void Renderer::draw(const State& state, const Camera3D& camera, double fixedDt, 
         debugText,
         sizeof(debugText),
         "FPS: %d\nSimulation time: %.4f s\nTimestep: %.6f s\nState: %s\n\n"
-        "Controls:\n  Space  Pause/resume\n  R      Reset\n  N      Single step while paused\n  Esc    Quit",
+        "Commands:\n  Drive: %.2f\n  Steer: %.2f\n\n"
+        "Box state:\n  Position (x, z): (%.3f, %.3f) m\n"
+        "  Linear velocity (x, z): (%.3f, %.3f) m/s\n"
+        "  Yaw angular velocity: %.3f rad/s\n\n"
+        "Controls:\n  W/S    Drive forward/backward\n  A/D    Steer left/right\n"
+        "  Space  Pause/resume\n  R      Reset\n"
+        "  N      Single step while paused\n  Esc    Quit",
         GetFPS(),
         state.simulationTime,
         fixedDt,
-        paused ? "Paused" : "Running");
+        paused ? "Paused" : "Running",
+        driveCommand,
+        steerCommand,
+        state.position.x,
+        state.position.z,
+        state.linearVelocity.x,
+        state.linearVelocity.z,
+        state.angularVelocity[1]);
     DrawText(debugText, 20, 20, 20, DARKGRAY);
     EndDrawing();
 }
