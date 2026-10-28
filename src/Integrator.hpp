@@ -3,54 +3,12 @@
 #include <algorithm>
 
 #include "State.hpp"
-#include <vsr/detail/vsr_generic_op.h>
 #include "raymath.h"
 
 class Integrator {
   public:
     virtual ~Integrator() = default;
     virtual void step(State &state, double dt) = 0;
-};
-
-// The first integration target is deliberately small: time advances while the
-// cube remains stationary until a physical model is added.
-class NullIntegrator final : public Integrator {
-  public:
-    void step(State &state, double dt) override {
-        state.simulationTime += dt;
-        state.position = Vector3Add(state.position, state.linearVelocity * dt);
-
-        // TODO(PHYSICS): Integrate position and velocity once a model exists.
-        // TODO(INTEGRATOR): Add a real numerical integration method.
-    }
-};
-
-class FreeParticleIntegrator : public Integrator {
-  public:
-    void step(State &state, double dt) override {
-        state.simulationTime += dt;
-        float h = dt;
-        state.prevPos = state.position - Vector3Scale(state.linearVelocity, h);
-        Vector3 increment = Vector3Subtract(state.position, state.prevPos); // Algebra Displacement
-        Vector3 nextPosition = Vector3Add(state.position, increment); // Group composition
-
-        state.prevPos = state.position;
-        state.position = nextPosition;
-    }
-};
-
-class RotatingFreeParticleIntegrator : public Integrator {
-  public:
-    void step(State &state, double dt) override {
-        state.simulationTime += dt;
-
-        const auto deltaRotor = vsr::nga::Gen::rot(
-            state.angularVelocity * (static_cast<double>(dt) * 0.5));
-        state.orientation = state.orientation * deltaRotor;
-
-        // TODO(PHYSICS): Integrate angular velocity from rotational dynamics.
-        // TODO(INTEGRATOR): Replace this kinematic test with derived equations.
-    }
 };
 
 // Commands are normalized player requests.  They are not physical quantities:
@@ -88,14 +46,12 @@ class ManeuverableBoxIntegrator final {
   public:
     void step(State &state, const ManeuverCommands &commands,
               const ManeuverModel &model, double dt) const {
-        // The box's local +x direction is its forward direction.  Spinning it
-        // by the orientation expresses that direction in the world frame.
-        const auto worldForwardBlade = vsr::ega::Vec::x.spin(state.orientation);
-        const Vector3 worldForward{
-            static_cast<float>(worldForwardBlade[0]),
-            0.0f,
-            static_cast<float>(worldForwardBlade[2]),
-        };
+        // The body-frame twist is converted only where the world-frame force
+        // model needs it.  The state itself never stores a world velocity.
+        Vector3 worldVelocity = planar_gafro::bodyToWorld(
+            state.pose, planar_gafro::linearVelocity(state.velocity));
+        const Vector3 worldForward =
+            planar_gafro::bodyToWorld(state.pose, {1.0f, 0.0f, 0.0f});
 
         const Vector3 driveForce =
             Vector3Scale(worldForward,
@@ -106,18 +62,19 @@ class ManeuverableBoxIntegrator final {
         // direction.
         const Vector3 nonFrictionForce = Vector3Add(driveForce, model.fixedForce);
         const float frictionLimit =
-            static_cast<float>(model.frictionLimitAt(state.position.x));
-        const float speed = Vector3Length(state.linearVelocity);
+            static_cast<float>(model.frictionLimitAt(
+                planar_gafro::translation(state.pose).x));
+        const float speed = Vector3Length(worldVelocity);
         const float nonFrictionForceMagnitude = Vector3Length(nonFrictionForce);
 
         if (speed <= model.stopSpeed && nonFrictionForceMagnitude <= frictionLimit) {
             // At rest, friction exactly balances the other planar forces when
             // its local capacity is sufficient to hold the box still.
-            state.linearVelocity = {};
+            worldVelocity = {};
         } else {
             const Vector3 frictionDirection =
                 speed > model.stopSpeed
-                    ? Vector3Scale(state.linearVelocity, 1.0f / speed)
+                    ? Vector3Scale(worldVelocity, 1.0f / speed)
                     : Vector3Scale(nonFrictionForce,
                                    1.0f / nonFrictionForceMagnitude);
             const Vector3 frictionForce =
@@ -126,17 +83,17 @@ class ManeuverableBoxIntegrator final {
             const Vector3 linearAcceleration =
                 Vector3Scale(netForce, static_cast<float>(1.0 / model.mass));
             const Vector3 nextVelocity = Vector3Add(
-                state.linearVelocity,
+                worldVelocity,
                 Vector3Scale(linearAcceleration, static_cast<float>(dt)));
 
             // If this step would reverse motion in a region that can hold the
             // box, stop instead of allowing a numerical back-and-forth.
             if (speed > model.stopSpeed &&
-                Vector3DotProduct(nextVelocity, state.linearVelocity) <= 0.0f &&
+                Vector3DotProduct(nextVelocity, worldVelocity) <= 0.0f &&
                 nonFrictionForceMagnitude <= frictionLimit) {
-                state.linearVelocity = {};
+                worldVelocity = {};
             } else {
-                state.linearVelocity = nextVelocity;
+                worldVelocity = nextVelocity;
             }
         }
 
@@ -145,16 +102,21 @@ class ManeuverableBoxIntegrator final {
 
         // Semi-implicit Euler: update velocity from force/torque, then use the
         // new velocity to reconstruct the configuration.
-        state.angularVelocity = state.angularVelocity +
-                                Bivector::xz * (yawAcceleration * dt);
+        const double nextYawRate = planar_gafro::yawRate(state.velocity) +
+                                   yawAcceleration * dt;
 
-        state.position = Vector3Add(
-            state.position,
-            Vector3Scale(state.linearVelocity, static_cast<float>(dt)));
-        const auto deltaRotor = vsr::nga::Gen::rot(
-            state.angularVelocity * (dt * 0.5));
-            
-        state.orientation = state.orientation * deltaRotor;
+        // Reconstruction: algebra-valued body motion -> motor increment ->
+        // new motor-valued pose.  exp handles translation and rotation as one
+        // SE(2) increment instead of separately adding a position vector and
+        // composing a rotor.
+        state.velocity = planar_gafro::makeTwist(
+            planar_gafro::worldToBody(state.pose, worldVelocity), nextYawRate);
+        state.pose *= planar_gafro::exp(state.velocity, dt);
+
+        // Forces above are still deliberately world-frame.  Re-express the
+        // same physical velocity in the new body frame for the next step.
+        state.velocity = planar_gafro::makeTwist(
+            planar_gafro::worldToBody(state.pose, worldVelocity), nextYawRate);
         state.simulationTime += dt;
     }
 };

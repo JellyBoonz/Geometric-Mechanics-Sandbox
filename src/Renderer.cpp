@@ -1,7 +1,6 @@
 #include "Renderer.hpp"
 
 #include <cstdio>
-#include <vsr/detail/vsr_generic_op.h>
 #include "rlgl.h"
 
 void Renderer::draw(const State& state, const Camera3D& camera, double fixedDt,
@@ -16,11 +15,11 @@ void Renderer::draw(const State& state, const Camera3D& camera, double fixedDt,
     DrawLine3D({0.0f, 0.0f, 0.0f}, {3.0f, 0.0f, 0.0f}, RED);
     DrawLine3D({0.0f, 0.0f, 0.0f}, {0.0f, 3.0f, 0.0f}, GREEN);
     DrawLine3D({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 3.0f}, BLUE);
-    const auto axisAngle = vsr::nga::Gen::aa(state.orientation);
+    const Vector3 position = planar_gafro::translation(state.pose);
     rlPushMatrix();
-    rlTranslatef(state.position.x, state.position.y, state.position.z);
-    rlRotatef(static_cast<float>(axisAngle[0]), static_cast<float>(axisAngle[1]),
-              static_cast<float>(axisAngle[2]), static_cast<float>(axisAngle[3]));
+    rlTranslatef(position.x, position.y, position.z);
+    rlRotatef(static_cast<float>(planar_gafro::yaw(state.pose) * 180.0 / PI),
+              0.0f, 1.0f, 0.0f);
     DrawCube({0.0f, 0.0f, 0.0f}, 1.0f, 1.0f, 1.0f, MAROON);
     DrawCubeWires({0.0f, 0.0f, 0.0f}, 1.0f, 1.0f, 1.0f, DARKBROWN);
     DrawLine3D({0.0f, 0.0f, 0.0f}, {1.5f, 0.0f, 0.0f}, RED);
@@ -29,7 +28,6 @@ void Renderer::draw(const State& state, const Camera3D& camera, double fixedDt,
     rlPopMatrix();
     EndMode3D();
 
-    const int lineHeight = 22;
     char debugText[512]{};
     std::snprintf(
         debugText,
@@ -55,11 +53,11 @@ void Renderer::draw(const State& state, const Camera3D& camera, double fixedDt,
         fixedForce.z,
         frictionCoefficient,
         frictionLimit,
-        state.position.x,
-        state.position.z,
-        state.linearVelocity.x,
-        state.linearVelocity.z,
-        state.angularVelocity[1]);
+        position.x,
+        position.z,
+        planar_gafro::linearVelocity(state.velocity).x,
+        planar_gafro::linearVelocity(state.velocity).z,
+        planar_gafro::yawRate(state.velocity));
     DrawText(debugText, 20, 20, 20, DARKGRAY);
     EndDrawing();
 }

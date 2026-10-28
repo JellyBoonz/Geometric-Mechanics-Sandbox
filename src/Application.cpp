@@ -56,8 +56,10 @@ void Application::run() {
         const auto &model = simulation_.model();
         renderer_.draw(simulation_.state(), camera_, fixedDt, paused_,
                        commands.drive, commands.steer, model.fixedForce,
-                       model.frictionCoefficientAt(simulation_.state().position.x),
-                       model.frictionLimitAt(simulation_.state().position.x));
+                       model.frictionCoefficientAt(
+                           planar_gafro::translation(simulation_.state().pose).x),
+                       model.frictionLimitAt(
+                           planar_gafro::translation(simulation_.state().pose).x));
     }
 
     CloseWindow();

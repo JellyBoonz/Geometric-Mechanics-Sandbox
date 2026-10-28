@@ -2,14 +2,15 @@
 
 This is a small C++20 application for learning mechanics, numerical integration,
 and geometric methods by implementing them directly. The current simulation
-uses a Versor rotor and bivector to give the cube a constant angular velocity.
+uses a gafro conformal-GA motor and a body-frame twist to move the box on the
+ground.
 
 ## Build
 
 Requirements: a C++20 compiler, CMake 3.20 or newer, and Git. CMake uses an
 installed raylib package when available and otherwise downloads raylib with
-`FetchContent`. It also downloads the pinned Versor headers. On macOS, the
-Homebrew raylib package can be installed with `brew install raylib`.
+`FetchContent`. It also downloads pinned Eigen and gafro sources. On macOS,
+the Homebrew raylib package can be installed with `brew install raylib`.
 
 ```sh
 cmake -S . -B build
@@ -47,16 +48,16 @@ paused, the accumulator stops and `N` invokes exactly one fixed simulation step.
 ## Classes and extension points
 
 - `Application`: window lifetime, input, fixed timestep, renderer, and simulation.
-- `State`: position, linear velocity, orientation rotor, angular velocity
-  bivector, and simulation time.
+- `State`: a gafro `Motor<double>` pose, its `Motor<double>::Generator`
+  body-frame twist, and simulation time. The simulation constrains those 3D
+  CGA values to ground translation and yaw; the twist holds forward, lateral,
+  and yaw velocities.
 - `Simulation`: current/initial state, reset, and update delegation.
-- `Integrator`: one-step integration interface; `NullIntegrator` currently only
-  advances simulation time.
+- `ManeuverableBoxIntegrator`: updates the velocity from forces and torque,
+  then reconstructs one fixed motor-valued pose step.
 - `Renderer`: read-only drawing of the state, grid, axes, cube, and debug text.
 
-The current rotational test computes a delta rotor from the constant angular
-velocity bivector and composes it with the current orientation. The renderer
-converts that rotor to an axis-angle representation only at the raylib
-boundary. The maneuver and friction work will primarily extend `Application`
-(input commands), `State` (physical quantities), `Simulation` (commands and
-model ownership), `Integrator` (one fixed step), and `Renderer` (diagnostics).
+The maneuver integrator maps the body-frame twist over one fixed timestep to a
+motor increment with `exp`, then composes it with the current pose. Forces are
+still evaluated in the world frame for this deliberately small model, and the
+resulting velocity is converted back to the body frame before reconstruction.

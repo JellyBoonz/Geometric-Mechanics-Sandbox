@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.20)
 
 project(geometric-mechanics-sandbox VERSION 0.1.0 LANGUAGES CXX)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -9,15 +11,35 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(FetchContent)
 
 FetchContent_Declare(
-    versor
-    GIT_REPOSITORY https://github.com/wolftype/versor.git
-    GIT_TAG 8262fce98c99ea6d9f0984d2ac17cde9fe5d0519
+    eigen
+    GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+    GIT_TAG 3.4.0
     GIT_SHALLOW TRUE
 )
-FetchContent_GetProperties(versor)
-if(NOT versor_POPULATED)
-    FetchContent_Populate(versor)
+set(EIGEN_BUILD_DOC OFF CACHE BOOL "" FORCE)
+set(project_build_testing ${BUILD_TESTING})
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(eigen)
+set(BUILD_TESTING ${project_build_testing} CACHE BOOL "" FORCE)
+if(NOT TARGET Eigen3::Eigen)
+    add_library(Eigen3::Eigen ALIAS eigen)
 endif()
+set(GEOMETRIC_MECHANICS_EIGEN_SOURCE_DIR "${eigen_SOURCE_DIR}")
+set(Eigen3_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+FetchContent_Declare(
+    gafro
+    GIT_REPOSITORY https://gitlab.com/gafro/gafro.git
+    GIT_TAG 5a8a5ec2cfd0d80b74017565f50824b9571a7e69
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(gafro)
+# The upstream target exports Eigen's legacy include path as an install
+# interface. That is valid after installation but invalid for a fetched source
+# tree, so retain only the two build interfaces this application needs.
+set_property(TARGET gafro PROPERTY INTERFACE_INCLUDE_DIRECTORIES
+    "$<BUILD_INTERFACE:${gafro_SOURCE_DIR}/src>;$<BUILD_INTERFACE:${eigen_SOURCE_DIR}>"
+)
 
 # Prefer a known-good system package when available. Otherwise CMake obtains
 # raylib automatically, keeping the project self-contained on other systems.
@@ -53,11 +75,15 @@ if(APPLE)
 endif()
 
 target_include_directories(geometric-mechanics-sandbox PRIVATE src)
-target_include_directories(geometric-mechanics-sandbox PRIVATE
-    ${versor_SOURCE_DIR}/include
-)
 set_property(TARGET geometric-mechanics-sandbox PROPERTY CXX_STANDARD 20)
-target_link_libraries(geometric-mechanics-sandbox PRIVATE raylib)
+target_link_libraries(geometric-mechanics-sandbox PRIVATE raylib gafro::gafro)
+
+if(BUILD_TESTING)
+    add_executable(planar-motor-tests tests/PlanarMotorTests.cpp)
+    target_include_directories(planar-motor-tests PRIVATE src)
+    target_link_libraries(planar-motor-tests PRIVATE raylib gafro::gafro)
+    add_test(NAME planar-motor-tests COMMAND planar-motor-tests)
+endif()
 
 if(APPLE)
     find_library(COCOA_FRAMEWORK Cocoa REQUIRED)
