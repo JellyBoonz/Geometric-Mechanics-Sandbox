@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include "State.hpp"
 #include <vsr/detail/vsr_generic_op.h>
 #include "raymath.h"
@@ -64,6 +66,22 @@ struct ManeuverModel {
     double yawMomentOfInertia{0.5};
     double maxDriveForce{8.0};
     double maxYawTorque{2.0};
+    Vector3 fixedForce{3.0f, 0.0f, 0.0f};
+    double gravity{9.81};
+    double minFrictionCoefficient{0.20};
+    double frictionCoefficientSlopePerMeter{0.05};
+    double maxFrictionCoefficient{0.80};
+    double stopSpeed{0.01};
+
+    double frictionCoefficientAt(double coordinate) const {
+        return std::clamp(minFrictionCoefficient +
+                              frictionCoefficientSlopePerMeter * coordinate,
+                          minFrictionCoefficient, maxFrictionCoefficient);
+    }
+
+    double frictionLimitAt(double coordinate) const {
+        return frictionCoefficientAt(coordinate) * mass * gravity;
+    }
 };
 
 class ManeuverableBoxIntegrator final {
@@ -82,16 +100,51 @@ class ManeuverableBoxIntegrator final {
         const Vector3 driveForce =
             Vector3Scale(worldForward,
                          static_cast<float>(commands.drive * model.maxDriveForce));
-        const Vector3 linearAcceleration =
-            Vector3Scale(driveForce, static_cast<float>(1.0 / model.mass));
+
+        // The fixed force is world-frame and always points in +x. Friction
+        // grows with world x, making the ground progressively rougher in that
+        // direction.
+        const Vector3 nonFrictionForce = Vector3Add(driveForce, model.fixedForce);
+        const float frictionLimit =
+            static_cast<float>(model.frictionLimitAt(state.position.x));
+        const float speed = Vector3Length(state.linearVelocity);
+        const float nonFrictionForceMagnitude = Vector3Length(nonFrictionForce);
+
+        if (speed <= model.stopSpeed && nonFrictionForceMagnitude <= frictionLimit) {
+            // At rest, friction exactly balances the other planar forces when
+            // its local capacity is sufficient to hold the box still.
+            state.linearVelocity = {};
+        } else {
+            const Vector3 frictionDirection =
+                speed > model.stopSpeed
+                    ? Vector3Scale(state.linearVelocity, 1.0f / speed)
+                    : Vector3Scale(nonFrictionForce,
+                                   1.0f / nonFrictionForceMagnitude);
+            const Vector3 frictionForce =
+                Vector3Scale(frictionDirection, -frictionLimit);
+            const Vector3 netForce = Vector3Add(nonFrictionForce, frictionForce);
+            const Vector3 linearAcceleration =
+                Vector3Scale(netForce, static_cast<float>(1.0 / model.mass));
+            const Vector3 nextVelocity = Vector3Add(
+                state.linearVelocity,
+                Vector3Scale(linearAcceleration, static_cast<float>(dt)));
+
+            // If this step would reverse motion in a region that can hold the
+            // box, stop instead of allowing a numerical back-and-forth.
+            if (speed > model.stopSpeed &&
+                Vector3DotProduct(nextVelocity, state.linearVelocity) <= 0.0f &&
+                nonFrictionForceMagnitude <= frictionLimit) {
+                state.linearVelocity = {};
+            } else {
+                state.linearVelocity = nextVelocity;
+            }
+        }
+
         const double yawAcceleration =
             commands.steer * model.maxYawTorque / model.yawMomentOfInertia;
 
         // Semi-implicit Euler: update velocity from force/torque, then use the
         // new velocity to reconstruct the configuration.
-        state.linearVelocity = Vector3Add(
-            state.linearVelocity,
-            Vector3Scale(linearAcceleration, static_cast<float>(dt)));
         state.angularVelocity = state.angularVelocity +
                                 Bivector::xz * (yawAcceleration * dt);
 

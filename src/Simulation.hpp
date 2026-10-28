@@ -12,6 +12,7 @@ class Simulation {
 
     const State &state() const;
     const ManeuverCommands &commands() const;
+    const ManeuverModel &model() const;
 
   private:
     State initialState_{};

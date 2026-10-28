@@ -5,7 +5,9 @@
 #include "rlgl.h"
 
 void Renderer::draw(const State& state, const Camera3D& camera, double fixedDt,
-                    bool paused, double driveCommand, double steerCommand) const {
+                    bool paused, double driveCommand, double steerCommand,
+                    Vector3 fixedForce, double frictionCoefficient,
+                    double frictionLimit) const {
     BeginDrawing();
     ClearBackground(RAYWHITE);
 
@@ -34,6 +36,9 @@ void Renderer::draw(const State& state, const Camera3D& camera, double fixedDt,
         sizeof(debugText),
         "FPS: %d\nSimulation time: %.4f s\nTimestep: %.6f s\nState: %s\n\n"
         "Commands:\n  Drive: %.2f\n  Steer: %.2f\n\n"
+        "Force field:\n  Fixed force (x, z): (%.2f, %.2f) N\n"
+        "  Friction coefficient at x: %.3f\n"
+        "  Friction capacity: %.3f N\n\n"
         "Box state:\n  Position (x, z): (%.3f, %.3f) m\n"
         "  Linear velocity (x, z): (%.3f, %.3f) m/s\n"
         "  Yaw angular velocity: %.3f rad/s\n\n"
@@ -46,6 +51,10 @@ void Renderer::draw(const State& state, const Camera3D& camera, double fixedDt,
         paused ? "Paused" : "Running",
         driveCommand,
         steerCommand,
+        fixedForce.x,
+        fixedForce.z,
+        frictionCoefficient,
+        frictionLimit,
         state.position.x,
         state.position.z,
         state.linearVelocity.x,

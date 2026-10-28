@@ -22,3 +22,7 @@ const State &Simulation::state() const {
 const ManeuverCommands &Simulation::commands() const {
     return commands_;
 }
+
+const ManeuverModel &Simulation::model() const {
+    return model_;
+}
